@@ -58,14 +58,12 @@ static NSDictionary *RKConnectionAttributeValuesWithObject(RKConnectionDescripti
 
 @interface RKRelationshipConnectionOperation ()
 @property (nonatomic, strong, readwrite) NSManagedObject *managedObject;
+@property (nonatomic, strong, readwrite) NSManagedObjectContext *managedObjectContext;
 @property (nonatomic, strong, readwrite) NSArray *connections;
 @property (nonatomic, strong, readwrite) id<RKManagedObjectCaching> managedObjectCache;
 @property (nonatomic, strong, readwrite) NSError *error;
 @property (nonatomic, strong, readwrite) NSMutableDictionary *connectedValuesByRelationshipName;
 @property (nonatomic, copy) void (^connectionBlock)(RKRelationshipConnectionOperation *operation, RKConnectionDescription *connection, id connectedValue);
-
-// Helpers
-@property (weak, nonatomic, readonly) NSManagedObjectContext *managedObjectContext;
 
 @end
 
@@ -82,16 +80,12 @@ static NSDictionary *RKConnectionAttributeValuesWithObject(RKConnectionDescripti
     self = [self init];
     if (self) {
         self.managedObject = managedObject;
+        self.managedObjectContext = managedObject.managedObjectContext;
         self.connections = connections;
         self.managedObjectCache = managedObjectCache;
     }
 
     return self;
-}
-
-- (NSManagedObjectContext *)managedObjectContext
-{
-    return self.managedObject.managedObjectContext;
 }
 
 - (id)relationshipValueForConnection:(RKConnectionDescription *)connection withConnectionResult:(id)result
