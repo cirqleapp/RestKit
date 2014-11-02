@@ -84,14 +84,14 @@ static NSDictionary *RKConnectionAttributeValuesWithObject(RKConnectionDescripti
         self.connections = connections;
         self.managedObjectCache = managedObjectCache;
     }
-
+    
     return self;
 }
 
 - (id)relationshipValueForConnection:(RKConnectionDescription *)connection withConnectionResult:(id)result
 {
     // TODO: Replace with use of object mapping engine for type conversion
-
+    
     // NOTE: This is a nasty hack to work around the fact that NSOrderedSet does not support key-value
     // collection operators. We try to detect and unpack a doubly wrapped collection
     if ([connection.relationship isToMany] && RKObjectIsCollectionOfCollections(result)) {
@@ -101,10 +101,10 @@ static NSDictionary *RKConnectionAttributeValuesWithObject(RKConnectionDescripti
                 [mutableSet addObject:object];
             }
         }
-
+        
         return mutableSet;
     }
-
+    
     if ([connection.relationship isToMany]) {
         if ([result isKindOfClass:[NSArray class]]) {
             if ([connection.relationship isOrdered]) {
@@ -132,36 +132,51 @@ static NSDictionary *RKConnectionAttributeValuesWithObject(RKConnectionDescripti
             }
         }
     }
-
+    
     return result;
 }
 
 - (id)findConnectedValueForConnection:(RKConnectionDescription *)connection shouldConnect:(BOOL *)shouldConnectRelationship
 {
     *shouldConnectRelationship = YES;
-    id connectionResult = nil;
-    if (connection.sourcePredicate && ![connection.sourcePredicate evaluateWithObject:self.managedObject]) return nil;
+    __block id connectionResult = nil;
+    
+    __block BOOL shouldReturn = NO;
+    [self.managedObjectContext performBlockAndWait:^{
+        shouldReturn = connection.sourcePredicate && ![connection.sourcePredicate evaluateWithObject:self.managedObject];
+    }];
+    if(shouldReturn){
+        return nil;
+    }
     
     if ([connection isForeignKeyConnection]) {
-        NSDictionary *attributeValues = RKConnectionAttributeValuesWithObject(connection, self.managedObject);
+        __block NSDictionary *attributeValues = nil;
+        [self.managedObjectContext performBlockAndWait:^{
+            attributeValues = RKConnectionAttributeValuesWithObject(connection, self.managedObject);
+        }];
         // If there are no attribute values available for connecting, skip the connection entirely
         if (! attributeValues) {
             *shouldConnectRelationship = NO;
             return nil;
         }
-        NSSet *managedObjects = [self.managedObjectCache managedObjectsWithEntity:[connection.relationship destinationEntity]
-                                                                  attributeValues:attributeValues
-                                                           inManagedObjectContext:self.managedObjectContext];
-        if (connection.destinationPredicate) managedObjects = [managedObjects filteredSetUsingPredicate:connection.destinationPredicate];
-        if (!connection.includesSubentities) managedObjects = [managedObjects filteredSetUsingPredicate:[NSPredicate predicateWithFormat:@"entity == %@", [connection.relationship destinationEntity]]];
-        if ([connection.relationship isToMany]) {
-            connectionResult = managedObjects;
-        } else {
-            if ([managedObjects count] > 1) RKLogWarning(@"Retrieved %ld objects satisfying connection criteria for one-to-one relationship connection: only one object will be connected.", (long) [managedObjects count]);
-            if ([managedObjects count]) connectionResult = [managedObjects anyObject];
-        }
+        
+        [self.managedObjectContext performBlockAndWait:^{
+            NSSet *managedObjects = [self.managedObjectCache managedObjectsWithEntity:[connection.relationship destinationEntity]
+                                                                      attributeValues:attributeValues
+                                                               inManagedObjectContext:self.managedObjectContext];
+            if (connection.destinationPredicate) managedObjects = [managedObjects filteredSetUsingPredicate:connection.destinationPredicate];
+            if (!connection.includesSubentities) managedObjects = [managedObjects filteredSetUsingPredicate:[NSPredicate predicateWithFormat:@"entity == %@", [connection.relationship destinationEntity]]];
+            if ([connection.relationship isToMany]) {
+                connectionResult = managedObjects;
+            } else {
+                if ([managedObjects count] > 1) RKLogWarning(@"Retrieved %ld objects satisfying connection criteria for one-to-one relationship connection: only one object will be connected.", (long) [managedObjects count]);
+                if ([managedObjects count]) connectionResult = [managedObjects anyObject];
+            }
+        }];
     } else if ([connection isKeyPathConnection]) {
-        connectionResult = [self.managedObject valueForKeyPath:connection.keyPath];
+        [self.managedObjectContext performBlockAndWait:^{
+            connectionResult = [self.managedObject valueForKeyPath:connection.keyPath];
+        }];
     } else {
         @throw [NSException exceptionWithName:NSInternalInconsistencyException
                                        reason:[NSString stringWithFormat:@"%@ Attempted to establish a relationship using a mapping that"
@@ -169,14 +184,25 @@ static NSDictionary *RKConnectionAttributeValuesWithObject(RKConnectionDescripti
                                                NSStringFromClass([self class]), connection]
                                      userInfo:nil];
     }
-
-    return [self relationshipValueForConnection:connection withConnectionResult:connectionResult];
+    
+    __block id result = nil;
+    [self.managedObjectContext performBlockAndWait:^{
+        result = [self relationshipValueForConnection:connection withConnectionResult:connectionResult];
+    }];
+    return result;
 }
 
 - (void)main
 {
     for (RKConnectionDescription *connection in self.connections) {
-        if (self.isCancelled || [self.managedObject isDeleted]) return;
+        __block BOOL shouldReturn = NO;
+        [self.managedObjectContext performBlockAndWait:^{
+            shouldReturn = self.isCancelled || [self.managedObject isDeleted];
+        }];
+        if(shouldReturn){
+            return;
+        }
+        
         NSString *relationshipName = connection.relationship.name;
         RKLogTrace(@"Connecting relationship '%@' with mapping: %@", relationshipName, connection);
         
