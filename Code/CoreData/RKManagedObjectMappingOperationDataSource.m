@@ -426,18 +426,21 @@ extern NSString * const RKObjectMappingNestingAttributeKeyName;
         return NO;
     }
     
-    // Delete any managed objects at the destination key path from the context
-    id existingValue = [mappingOperation.destinationObject valueForKeyPath:relationshipMapping.destinationKeyPath];
-    if ([existingValue isKindOfClass:[NSManagedObject class]]) {
-        [self.managedObjectContext deleteObject:existingValue];
-    } else {
-        if (RKObjectIsCollection(existingValue)) {
-            for (NSManagedObject *managedObject in existingValue) {
-                if (! [managedObject isKindOfClass:[NSManagedObject class]]) continue;
-                [self.managedObjectContext deleteObject:managedObject];
+    RKManagedObjectMappingOperationDataSource * __weak wSelf = self;
+    [self.managedObjectContext performBlockAndWait:^{
+        // Delete any managed objects at the destination key path from the context
+        id existingValue = [mappingOperation.destinationObject valueForKeyPath:relationshipMapping.destinationKeyPath];
+        if ([existingValue isKindOfClass:[NSManagedObject class]]) {
+            [wSelf.managedObjectContext deleteObject:existingValue];
+        } else {
+            if (RKObjectIsCollection(existingValue)) {
+                for (NSManagedObject *managedObject in existingValue) {
+                    if (! [managedObject isKindOfClass:[NSManagedObject class]]) continue;
+                    [wSelf.managedObjectContext deleteObject:managedObject];
+                }
             }
         }
-    }
+    }];
     
     return YES;
 }

@@ -650,21 +650,22 @@ static NSString *const RKSelfKeyPathPrefix = @"self.";
 {
     if (! RKIsManagedObject(self.destinationObject)) return NO;
     
-    RKLogTrace(@"Mapping a to-many relationship for an `NSManagedObject`. About to apply value via mutable[Set|Array]ValueForKey");
-    if ([valueForRelationship isKindOfClass:[NSSet class]]) {
-        RKLogTrace(@"Mapped `NSSet` relationship object from keyPath '%@' to '%@'. Value: %@", relationshipMapping.sourceKeyPath, relationshipMapping.destinationKeyPath, valueForRelationship);
-        NSMutableSet *destinationSet = [self.destinationObject mutableSetValueForKeyPath:relationshipMapping.destinationKeyPath];
-        [destinationSet setSet:valueForRelationship];
-    } else if ([valueForRelationship isKindOfClass:[NSArray class]]) {
-        RKLogTrace(@"Mapped `NSArray` relationship object from keyPath '%@' to '%@'. Value: %@", relationshipMapping.sourceKeyPath, relationshipMapping.destinationKeyPath, valueForRelationship);
-        NSMutableArray *destinationArray = [self.destinationObject mutableArrayValueForKeyPath:relationshipMapping.destinationKeyPath];
-        [destinationArray setArray:valueForRelationship];
-    } else if ([valueForRelationship isKindOfClass:[NSOrderedSet class]]) {
-        [self performBlockInDataSourceContextIfExists:^{
+    [self performBlockInDataSourceContextIfExists:^{
+        RKLogTrace(@"Mapping a to-many relationship for an `NSManagedObject`. About to apply value via mutable[Set|Array]ValueForKey");
+        if ([valueForRelationship isKindOfClass:[NSSet class]]) {
+            RKLogTrace(@"Mapped `NSSet` relationship object from keyPath '%@' to '%@'. Value: %@", relationshipMapping.sourceKeyPath, relationshipMapping.destinationKeyPath, valueForRelationship);
+            NSMutableSet *destinationSet = [self.destinationObject mutableSetValueForKeyPath:relationshipMapping.destinationKeyPath];
+            [destinationSet setSet:valueForRelationship];
+        } else if ([valueForRelationship isKindOfClass:[NSArray class]]) {
+            RKLogTrace(@"Mapped `NSArray` relationship object from keyPath '%@' to '%@'. Value: %@", relationshipMapping.sourceKeyPath, relationshipMapping.destinationKeyPath, valueForRelationship);
+            NSMutableArray *destinationArray = [self.destinationObject mutableArrayValueForKeyPath:relationshipMapping.destinationKeyPath];
+            [destinationArray setArray:valueForRelationship];
+        } else if ([valueForRelationship isKindOfClass:[NSOrderedSet class]]) {
             RKLogTrace(@"Mapped `NSOrderedSet` relationship object from keyPath '%@' to '%@'. Value: %@", relationshipMapping.sourceKeyPath, relationshipMapping.destinationKeyPath, valueForRelationship);
             [self.destinationObject setValue:valueForRelationship forKeyPath:relationshipMapping.destinationKeyPath];
-        }];
-    }
+        }
+    }];
+    
     
     return YES;
 }
