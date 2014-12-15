@@ -195,14 +195,11 @@ static NSDictionary *RKConnectionAttributeValuesWithObject(RKConnectionDescripti
 - (void)main
 {
     for (RKConnectionDescription *connection in self.connections) {
-        __block BOOL shouldReturn = NO;
-        [self.managedObjectContext performBlockAndWait:^{
-            shouldReturn = self.isCancelled || [self.managedObject isDeleted];
+        __block BOOL isDeleted;
+        [self.managedObject.managedObjectContext performBlockAndWait:^{
+            isDeleted=[self.managedObject isDeleted];
         }];
-        if(shouldReturn){
-            return;
-        }
-        
+        if (self.isCancelled || isDeleted) return;
         NSString *relationshipName = connection.relationship.name;
         RKLogTrace(@"Connecting relationship '%@' with mapping: %@", relationshipName, connection);
         

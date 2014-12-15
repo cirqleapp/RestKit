@@ -824,10 +824,9 @@ BOOL RKDoesArrayOfResponseDescriptorsContainOnlyEntityMappings(NSArray *response
         }];
     }
     
-    RKManagedObjectRequestOperation * __weak wSelf = self;
-    __block BOOL hasChanges = NO;
+    __block BOOL hasChanges;
     [self.privateContext performBlockAndWait:^{
-        hasChanges = [wSelf.privateContext hasChanges];
+        hasChanges = [self.privateContext hasChanges];
     }];
     if (hasChanges) {
         return [self saveContext:self.privateContext error:error];
